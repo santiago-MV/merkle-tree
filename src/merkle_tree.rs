@@ -4,7 +4,8 @@ pub struct MerkleTree {
     leaf_amount: usize,
 }
 impl MerkleTree {
-    fn generate_tree<H: Hash>(&mut self, data: &[H]) {
+    /// Creates a new tree from an array of hashable data
+    pub fn new<H: Hash>(data: &[H]) -> MerkleTree {
         // Vector that will hold the hashed values
         let mut hashed_tree: Vec<u64> = Vec::new();
         // Hash the user data and push it into the vector
@@ -13,12 +14,16 @@ impl MerkleTree {
         }
         // Check if the amount of nodes is a power of two, if not complete it with 0
         add_padding(&mut hashed_tree);
-        // Reverse hashed_tree so that the combined hashes can be pushed
+        // Reverse hashed_tree so that the last leaf is in the head and the combined hashes can be pushed
         hashed_tree.reverse();
-        self.tree = hashed_tree;
-        self.generate_from_hashes();
+        let mut merkle_tree = MerkleTree {
+            tree: hashed_tree,
+            leaf_amount: data.len(),
+        };
+        merkle_tree.generate_from_hashes();
+        merkle_tree
     }
-
+    /// Generates the full tree from an array of hashed leafs
     fn generate_from_hashes(&mut self) {
         // Calculate the amount of nodes the binary tree will have
         // number_of_nodes = 2 * amount_of_leafs - 1
@@ -37,7 +42,7 @@ impl MerkleTree {
         // Reverse the vector so that the root is the head
         self.tree.reverse();
     }
-
+    /// Adds a new leaf into the tree, regenerating the full tree
     pub fn push<H: Hash>(&mut self, data: &H) {
         let length = self.tree.len();
         let mut leafs = self.tree[(length - self.leaf_amount)..].to_vec();
@@ -53,18 +58,41 @@ impl MerkleTree {
         self.generate_from_hashes();
     }
 
+    pub fn generate_proof(&self, index: usize) -> Vec<u64> {
+        if index > self.leaf_amount {
+            panic!("Index out of bounds");
+        }
+        let mut proof = Vec::new();
+        let offset = self.tree.len() - self.leaf_amount;
+        let mut actual_index = index + offset;
+        loop {
+            // If actual_index points to the root then push it and break
+            if actual_index == 0 {
+                proof.push(self.tree[0]);
+                break;
+            }
+            // If actual index is even, then is pointing to the left child, push the right one
+            if actual_index % 2 == 0 {
+                proof.push(self.tree[actual_index - 1]);
+            }
+            // If its odd, its pointing to the rigth child, push the left child one
+            else {
+                proof.push(self.tree[actual_index + 1]);
+            }
+            // By substracting 1 and dividing by 2 we are referencing the parent node
+            // Left child = parent_node * 2 + 1
+            // Right child = parent_node * 2 + 2
+            // Parent_node = (child_node-1)/2
+            actual_index = (actual_index - 1) / 2;
+        }
+        // Reverse it to pop the next hash needed for verifying
+        proof.reverse();
+        proof
+    }
+
     pub fn get_tree(&self) -> Vec<u64> {
         self.tree.clone()
     }
-}
-// Creates a new instance of MerkleTree and generates its tree value from the array
-pub fn new<H: Hash>(data: &[H]) -> MerkleTree {
-    let mut initialized_tree = MerkleTree {
-        tree: Vec::new(),
-        leaf_amount: data.len(),
-    };
-    initialized_tree.generate_tree(data);
-    initialized_tree
 }
 
 fn closest_power_of_2(number: u128) -> u128 {
@@ -104,12 +132,14 @@ fn add_padding(tree: &mut Vec<u64>) {
 
 #[cfg(test)]
 mod test {
-    use super::new;
+    use std::hash::DefaultHasher;
+
+    use crate::merkle_tree::MerkleTree;
 
     #[test]
     fn creation_test() {
-        let not_power_of_two_tree = new(&[0; 5]);
-        let closes_power_of_two_tree = new(&[0; 8]);
+        let not_power_of_two_tree = MerkleTree::new(&[0; 5]);
+        let closes_power_of_two_tree = MerkleTree::new(&[0; 8]);
         assert_eq!(
             not_power_of_two_tree.get_tree(),
             closes_power_of_two_tree.get_tree()
@@ -117,9 +147,31 @@ mod test {
     }
     #[test]
     fn push_test() {
-        let mut first_tree = new(&[0, 0, 0, 0]);
-        let second_tree = new(&[0, 0, 0, 0, 1]);
+        let mut first_tree = MerkleTree::new(&[0, 0, 0, 0]);
+        let second_tree = MerkleTree::new(&[0, 0, 0, 0, 1]);
         first_tree.push(&1);
         assert_eq!(first_tree.get_tree(), second_tree.get_tree());
+    }
+    #[test]
+    fn generate_proof_left() {
+        let tree = MerkleTree::new(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        let proof = tree.generate_proof(7);
+        let mut test_proof = Vec::new();
+        test_proof.push(tree.tree[0]);
+        test_proof.push(tree.tree[1]);
+        test_proof.push(tree.tree[5]);
+        test_proof.push(tree.tree[13]);
+        assert_eq!(proof, test_proof)
+    }
+    #[test]
+    fn generate_proof_rigth() {
+        let tree = MerkleTree::new(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        let proof = tree.generate_proof(2);
+        let mut test_proof = Vec::new();
+        test_proof.push(tree.tree[0]);
+        test_proof.push(tree.tree[2]);
+        test_proof.push(tree.tree[3]);
+        test_proof.push(tree.tree[10]);
+        assert_eq!(proof, test_proof)
     }
 }
