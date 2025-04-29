@@ -8,9 +8,7 @@ impl MerkleTree {
         let mut hashed_tree: Vec<u64> = Vec::new();
         // Hash the user data and push it into the vector
         for d in data {
-            let mut hasher = DefaultHasher::new();
-            (*d).hash(&mut hasher);
-            hashed_tree.push(hasher.finish());
+            add_hash(d, &mut hashed_tree);
         }
         // Check if the amount of nodes is a power of two, if not complete it with 0
         if !is_power_of_2(hashed_tree.len() as u128) {
@@ -19,9 +17,7 @@ impl MerkleTree {
                 if power_of_2 == hashed_tree.len() as u128 {
                     break;
                 }
-                let mut hasher = DefaultHasher::new();
-                0.hash(&mut hasher);
-                hashed_tree.push(hasher.finish());
+                add_hash(&0, &mut hashed_tree);
             }
         }
         // Reverse hashed_tree so that the combined hashes can be pushed
@@ -32,9 +28,9 @@ impl MerkleTree {
         // Calculate the combined hashes and push it
         let mut index = 0;
         loop {
-            let mut hasher = DefaultHasher::new();
-            (hashed_tree[index] as u128 + hashed_tree[index + 1] as u128).hash(&mut hasher);
-            hashed_tree.push(hasher.finish());
+            let left_data = hashed_tree[index];
+            let right_data = hashed_tree[index + 1];
+            add_two_hashes(&left_data, &right_data, &mut hashed_tree);
             index += 2;
             if index >= number_of_nodes - 1 {
                 break;
@@ -50,7 +46,7 @@ impl MerkleTree {
         self.tree.clone()
     }
 }
-// Creates a new MekleTree and generates the tree from the argument array
+// Creates a new instance of MerkleTree and generates its tree value from the array
 pub fn new<H: Hash>(data: &[H]) -> MerkleTree {
     let mut initialized_tree = MerkleTree { tree: Vec::new() };
     initialized_tree.generate_tree(data);
@@ -64,7 +60,7 @@ fn is_power_of_2(number: u128) -> bool {
         if value == 2 {
             return true;
         }
-        // if the value is odd return falshe
+        // if the value is odd return false
         if value % 2 != 0 {
             return false;
         }
@@ -81,6 +77,19 @@ fn closest_power_of_2(number: u128) -> u128 {
         }
         power *= 2;
     }
+}
+
+fn add_hash<H: Hash>(data: &H, hashed_tree: &mut Vec<u64>) {
+    let mut hasher = DefaultHasher::new();
+    (*data).hash(&mut hasher);
+    hashed_tree.push(hasher.finish());
+}
+
+fn add_two_hashes<H: Hash>(left_data: &H, right_data: &H, hashed_tree: &mut Vec<u64>) {
+    let mut hasher = DefaultHasher::new();
+    (*left_data).hash(&mut hasher);
+    (*right_data).hash(&mut hasher);
+    hashed_tree.push(hasher.finish());
 }
 
 #[cfg(test)]
