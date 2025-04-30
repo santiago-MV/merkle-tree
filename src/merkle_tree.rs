@@ -16,7 +16,7 @@ impl MerkleTree {
         }
         // Check if the amount of leafs is a power of two, if not complete it with 0
         add_padding(&mut leafs, data.len().next_power_of_two());
-        let hashed_tree = generate_from_hashes(&mut leafs);
+        let hashed_tree = generate_tree_from_hashes(&mut leafs);
         MerkleTree {
             tree: hashed_tree,
             data_amount: data.len(),
@@ -56,7 +56,7 @@ impl MerkleTree {
             let mut leafs = vec![hash_value(data)];
             // Add padding so that both subtrees have the same amount of leafs
             add_padding(&mut leafs, self.tree[0].len());
-            let right_subtree = generate_from_hashes(&mut leafs);
+            let right_subtree = generate_tree_from_hashes(&mut leafs);
             merge_trees(&mut self.tree, right_subtree);
         }
         self.data_amount += 1;
@@ -133,7 +133,7 @@ pub fn add_padding(tree_level: &mut Vec<u64>, up_to: usize) {
 }
 /// Generates a full tree from a list of hashed leafs.
 /// It returns a list of vectors, each representing a level of the tree
-pub fn generate_from_hashes(leafs: &mut [u64]) -> Vec<Vec<u64>> {
+pub fn generate_tree_from_hashes(leafs: &mut [u64]) -> Vec<Vec<u64>> {
     let mut tree = Vec::new();
     tree.push(leafs.to_vec());
     // Calculate the combined hashes and push it
@@ -184,7 +184,7 @@ pub fn merge_trees(left_subtree: &mut Vec<Vec<u64>>, mut right_subtree: Vec<Vec<
 
 #[cfg(test)]
 mod test {
-    use crate::{MerkleTree, generate_from_hashes, hash_value, merge_trees};
+    use crate::{MerkleTree, generate_tree_from_hashes, hash_value, merge_trees};
 
     #[test]
     fn creation_test() {
@@ -199,10 +199,10 @@ mod test {
     fn merge_test() {
         let hashed_0 = hash_value(&0);
         let hashed_1 = hash_value(&1);
-        let mut left_subtree = generate_from_hashes(&mut vec![hashed_0; 4]);
-        let right_subtree = generate_from_hashes(&mut vec![hashed_1; 4]);
+        let mut left_subtree = generate_tree_from_hashes(&mut vec![hashed_0; 4]);
+        let right_subtree = generate_tree_from_hashes(&mut vec![hashed_1; 4]);
         merge_trees(&mut left_subtree, right_subtree);
-        let res = generate_from_hashes(&mut vec![
+        let res = generate_tree_from_hashes(&mut vec![
             hashed_0, hashed_0, hashed_0, hashed_0, hashed_1, hashed_1, hashed_1, hashed_1,
         ]);
         assert_eq!(res, left_subtree);
