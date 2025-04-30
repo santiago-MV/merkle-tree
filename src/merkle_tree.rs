@@ -127,7 +127,7 @@ pub fn hash_two_values<H: Hash>(left_child: &H, right_child: &H) -> u64 {
 }
 /// Add hashed 0s up to a desire size
 pub fn add_padding(tree_level: &mut Vec<u64>, up_to: usize) {
-    if !tree_level.is_empty(){
+    if !tree_level.is_empty() {
         loop {
             if up_to == tree_level.len() {
                 break;
@@ -143,7 +143,7 @@ pub fn generate_tree_from_hashes(leaves: &mut [u64]) -> Vec<Vec<u64>> {
     tree.push(leaves.to_vec());
     // Calculate the combined hashes and push it
     let mut level_index = 0;
-    if leaves.len()>1{
+    if leaves.len() > 1 {
         loop {
             let mut next_level = Vec::new();
             let mut index = 0;
@@ -163,7 +163,7 @@ pub fn generate_tree_from_hashes(leaves: &mut [u64]) -> Vec<Vec<u64>> {
                 break;
             }
         }
-    }   
+    }
     tree
 }
 /// Merges the second tree into the first one and calculates the new root
