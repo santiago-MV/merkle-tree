@@ -113,20 +113,20 @@ impl MerkleTree {
     }
 }
 
-pub fn hash_value<H: Hash>(data: &H) -> u64 {
+fn hash_value<H: Hash>(data: &H) -> u64 {
     let mut hasher = DefaultHasher::new();
     (*data).hash(&mut hasher);
     hasher.finish()
 }
 /// Receives 2 values and returns their combined hash, order matters
-pub fn hash_two_values<H: Hash>(left_child: &H, right_child: &H) -> u64 {
+fn hash_two_values<H: Hash>(left_child: &H, right_child: &H) -> u64 {
     let mut hasher = DefaultHasher::new();
     (*left_child).hash(&mut hasher);
     (*right_child).hash(&mut hasher);
     hasher.finish()
 }
 /// Add hashed 0s up to a desire size
-pub fn add_padding(tree_level: &mut Vec<u64>, up_to: usize) {
+fn add_padding(tree_level: &mut Vec<u64>, up_to: usize) {
     if !tree_level.is_empty() {
         loop {
             if up_to == tree_level.len() {
@@ -138,7 +138,7 @@ pub fn add_padding(tree_level: &mut Vec<u64>, up_to: usize) {
 }
 /// Generates a full tree from a list of hashed leaves.
 /// It returns a list of vectors, each representing a level of the tree
-pub fn generate_tree_from_hashes(leaves: &mut [u64]) -> Vec<Vec<u64>> {
+fn generate_tree_from_hashes(leaves: &mut [u64]) -> Vec<Vec<u64>> {
     let mut tree = Vec::new();
     tree.push(leaves.to_vec());
     // Calculate the combined hashes and push it
@@ -168,7 +168,7 @@ pub fn generate_tree_from_hashes(leaves: &mut [u64]) -> Vec<Vec<u64>> {
 }
 /// Merges the second tree into the first one and calculates the new root
 // Given 2 full binary trees merge the second one into the first one, appending each level together and calculating the new root
-pub fn merge_trees(left_subtree: &mut Vec<Vec<u64>>, mut right_subtree: Vec<Vec<u64>>) {
+fn merge_trees(left_subtree: &mut Vec<Vec<u64>>, mut right_subtree: Vec<Vec<u64>>) {
     // Panic if trees haven't the same amount of floors
     if left_subtree.len() != right_subtree.len() {
         panic!("Trees must have the same amount of floors");
