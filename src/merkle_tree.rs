@@ -1,32 +1,32 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
+
 pub struct MerkleTree {
     tree: Vec<Vec<u64>>,
-    leaf_amount: usize,
+    data_amount: usize, // Data set by the user
 }
+
 impl MerkleTree {
     /// Creates a new tree from an array of hashable data
     pub fn new<H: Hash>(data: &[H]) -> MerkleTree {
         // Tree representation + leaf vector
-        let mut hashed_tree: Vec<Vec<u64>> = Vec::new();
         let mut leafs: Vec<u64> = Vec::new();
         // Hash the user data and push it into the vector
         for d in data {
             leafs.push(hash_value(d));
         }
         // Check if the amount of leafs is a power of two, if not complete it with 0
-        add_padding(&mut leafs, closest_power_of_2(data.len()));
-        hashed_tree.push(leafs);
-        generate_from_hashes(&mut hashed_tree);
+        add_padding(&mut leafs, data.len().next_power_of_two());
+        let hashed_tree = generate_from_hashes(&mut leafs);
         MerkleTree {
             tree: hashed_tree,
-            leaf_amount: data.len(),
+            data_amount: data.len(),
         }
     }
     /// Adds a new leaf into the tree, regenerating the full tree
     pub fn push<H: Hash>(&mut self, data: &H) {
         // If the last level of the tree is bigger or equal than the amount of inputed data leafs then the level has padding, the value can be overwritten
-        if self.tree[0].len() > self.leaf_amount {
-            let mut index = self.leaf_amount + 1;
+        if self.tree[0].len() > self.data_amount {
+            let mut index = self.data_amount;
             let mut level = 1;
             self.tree[0][index] = hash_value(data);
             // Recalculate necessary nodes
@@ -41,30 +41,25 @@ impl MerkleTree {
                 // Index pointing to the right child
                 else {
                     self.tree[level][index / 2] = hash_two_values(
-                        &self.tree[level - 1][index-1],
+                        &self.tree[level - 1][index - 1],
                         &self.tree[level - 1][index],
                     );
                 }
-                level += 1;
-                index /= 2;
                 if self.tree[level].len() == 1 {
                     break;
                 }
+                level += 1;
+                index /= 2;
             }
         } else {
-            // If there wasn't padding, there wasn't free space then push the value and add padding
-            
-            // The amount of elements in the last level has duplicated, every node in the current tree is now part of the left subtree
-            // Calculate the right subtree
-            let mut right_subtree = Vec::new();
-            let mut new_leafs = vec![hash_value(data)];
-            // The array will duplicate its value
-            add_padding(&mut new_leafs,self.tree[0].len());
-            print!("{:?}",new_leafs);
-            right_subtree.push(new_leafs);
-            generate_from_hashes(&mut right_subtree);
+            // If there wasn't any free space then the amount of leafs will duplicate
+            let mut leafs = vec![hash_value(data)];
+            // Add padding so that both subtrees have the same amount of leafs
+            add_padding(&mut leafs, self.tree[0].len());
+            let right_subtree = generate_from_hashes(&mut leafs);
             merge_trees(&mut self.tree, right_subtree);
         }
+        self.data_amount += 1;
     }
     /// Given the index of the data that wants to be validated, generate the array of hashes needed to validate that position
     pub fn generate_proof(&self, index: usize) -> Vec<u64> {
@@ -86,14 +81,14 @@ impl MerkleTree {
             // Update the index for the next level
             mutable_index /= 2;
             level_index += 1;
-            if level_index == self.tree.len()-1{
+            if level_index == self.tree.len() - 1 {
                 break;
             }
         }
         proof
     }
 
-    pub fn verify<H:Hash>(&self,value:H,index:usize,proof: &mut Vec<u64>) -> bool{
+    pub fn verify<H: Hash>(&self, value: H, index: usize, proof: &mut Vec<u64>) -> bool {
         let mut mutable_index = index;
         let mut hashed_value = hash_value(&value);
         for i in proof {
@@ -103,11 +98,11 @@ impl MerkleTree {
             }
             // Its pointing to the right child
             else {
-               hashed_value = hash_two_values(i,&hashed_value);
+                hashed_value = hash_two_values(i, &hashed_value);
             }
             mutable_index /= 2;
         }
-        hashed_value == self.tree[self.tree.len()-1][0]
+        hashed_value == self.tree[self.tree.len() - 1][0]
     }
 
     pub fn get_tree(&self) -> Vec<Vec<u64>> {
@@ -115,35 +110,32 @@ impl MerkleTree {
     }
 }
 
-fn closest_power_of_2(number: usize) -> usize {
-    number.next_power_of_two()
-}
-
-fn hash_value<H: Hash>(data: &H) -> u64 {
+pub fn hash_value<H: Hash>(data: &H) -> u64 {
     let mut hasher = DefaultHasher::new();
     (*data).hash(&mut hasher);
     hasher.finish()
 }
-
-fn hash_two_values<H: Hash>(left_child: &H, right_child: &H) -> u64 {
+/// Receives 2 values and returns their combined hash, order matters
+pub fn hash_two_values<H: Hash>(left_child: &H, right_child: &H) -> u64 {
     let mut hasher = DefaultHasher::new();
     (*left_child).hash(&mut hasher);
     (*right_child).hash(&mut hasher);
     hasher.finish()
 }
-// If the leaf amount isn't a power of 2 then add the minimum amount of 0 possible to make it one
-fn add_padding(tree_level: &mut Vec<u64>,up_to: usize) {
-    if tree_level.len() == 1 || !tree_level.len().is_power_of_two(){
-        loop {
-            if up_to == tree_level.len(){
-                break;
-            }
-            tree_level.push(hash_value(&0));
+/// Add hashed 0s up to a desire size
+pub fn add_padding(tree_level: &mut Vec<u64>, up_to: usize) {
+    loop {
+        if up_to == tree_level.len() {
+            break;
         }
+        tree_level.push(hash_value(&0));
     }
 }
-/// Generates the full tree from an array of hashed leafs
-fn generate_from_hashes(tree: &mut Vec<Vec<u64>>) {
+/// Generates a full tree from a list of hashed leafs.
+/// It returns a list of vectors, each representing a level of the tree
+pub fn generate_from_hashes(leafs: &mut [u64]) -> Vec<Vec<u64>> {
+    let mut tree = Vec::new();
+    tree.push(leafs.to_vec());
     // Calculate the combined hashes and push it
     let mut level_index = 0;
     loop {
@@ -165,17 +157,19 @@ fn generate_from_hashes(tree: &mut Vec<Vec<u64>>) {
             break;
         }
     }
+    tree
 }
-
-fn merge_trees(left_subtree: &mut Vec<Vec<u64>>, mut rigth_subtree: Vec<Vec<u64>>) {
+/// Merges the second tree into the first one and calculates the new root
+// Given 2 full binary trees merge the second one into the first one, appending each level together and calculating the new root
+pub fn merge_trees(left_subtree: &mut Vec<Vec<u64>>, mut right_subtree: Vec<Vec<u64>>) {
     // Panic if trees haven't the same amount of floors
-    if left_subtree.len() != rigth_subtree.len() {
+    if left_subtree.len() != right_subtree.len() {
         panic!("Trees must have the same amount of floors");
     }
     let len = left_subtree.len();
     let mut index = 0;
     loop {
-        left_subtree[index].append(&mut rigth_subtree[index]);
+        left_subtree[index].append(&mut right_subtree[index]);
         index += 1;
         if index == len {
             break;
@@ -190,16 +184,28 @@ fn merge_trees(left_subtree: &mut Vec<Vec<u64>>, mut rigth_subtree: Vec<Vec<u64>
 
 #[cfg(test)]
 mod test {
-    use crate::merkle_tree::MerkleTree;
+    use crate::{MerkleTree, generate_from_hashes, hash_value, merge_trees};
 
     #[test]
     fn creation_test() {
         let not_power_of_two_tree = MerkleTree::new(&[0; 5]);
-        let closes_power_of_two_tree = MerkleTree::new(&[0; 8]);
+        let closest_power_of_two_tree = MerkleTree::new(&[0; 8]);
         assert_eq!(
             not_power_of_two_tree.get_tree(),
-            closes_power_of_two_tree.get_tree()
+            closest_power_of_two_tree.get_tree()
         );
+    }
+    #[test]
+    fn merge_test() {
+        let hashed_0 = hash_value(&0);
+        let hashed_1 = hash_value(&1);
+        let mut left_subtree = generate_from_hashes(&mut vec![hashed_0; 4]);
+        let right_subtree = generate_from_hashes(&mut vec![hashed_1; 4]);
+        merge_trees(&mut left_subtree, right_subtree);
+        let res = generate_from_hashes(&mut vec![
+            hashed_0, hashed_0, hashed_0, hashed_0, hashed_1, hashed_1, hashed_1, hashed_1,
+        ]);
+        assert_eq!(res, left_subtree);
     }
     #[test]
     fn push_test() {
@@ -208,7 +214,7 @@ mod test {
         first_tree.push(&1);
         assert_eq!(first_tree.get_tree(), second_tree.get_tree());
     }
-    
+
     #[test]
     fn generate_proof_left() {
         let tree = MerkleTree::new(&[1, 2, 3, 4, 5, 6, 7, 8]);
@@ -228,5 +234,24 @@ mod test {
         test_proof.push(tree.tree[1][0]);
         test_proof.push(tree.tree[2][1]);
         assert_eq!(proof, test_proof)
+    }
+    #[test]
+    fn verify_pass() {
+        let tree = MerkleTree::new(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        let mut proof = tree.generate_proof(2);
+        assert_eq!(tree.verify(3, 2, &mut proof), true);
+    }
+
+    #[test]
+    fn verify_fail() {
+        let tree = MerkleTree::new(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        let mut proof = tree.generate_proof(2);
+        assert_eq!(tree.verify(5, 2, &mut proof), false);
+        assert_eq!(tree.verify(3, 5, &mut proof), false);
+        assert_eq!(tree.verify(5, 5, &mut proof), false);
+        assert_eq!(
+            tree.verify(3, 2, &mut vec![tree.tree[0][1], tree.tree[1][3]]),
+            false
+        );
     }
 }

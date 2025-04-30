@@ -3,4 +3,8 @@ name = "merkle-tree"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "merkle_tree"
+path = "./src/merkle_tree.rs"
+
 [dependencies]
