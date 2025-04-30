@@ -9,22 +9,25 @@ impl MerkleTree {
     /// Creates a new tree from an array of hashable data
     pub fn new<H: Hash>(data: &[H]) -> MerkleTree {
         // Tree representation + leaf vector
-        let mut leafs: Vec<u64> = Vec::new();
+        let mut leaves: Vec<u64> = Vec::new();
         // Hash the user data and push it into the vector
         for d in data {
-            leafs.push(hash_value(d));
+            leaves.push(hash_value(d));
         }
-        // Check if the amount of leafs is a power of two, if not complete it with 0
-        add_padding(&mut leafs, data.len().next_power_of_two());
-        let hashed_tree = generate_tree_from_hashes(&mut leafs);
+        // Check if the amount of leaves is a power of two, if not complete it with 0
+        add_padding(&mut leaves, data.len().next_power_of_two());
+        let hashed_tree = generate_tree_from_hashes(&mut leaves);
         MerkleTree {
             tree: hashed_tree,
             data_amount: data.len(),
         }
     }
-    /// Adds a new leaf into the tree, regenerating the full tree
+    /// Dinamically add a new element into the tree
+    /// The element is added at the leaves element
+    /// If there is padding, the value takes the position of the first padding element
+    /// If there isn't padding, generate a subtree with the same amount of leaves as the original tree and merge it into the original one
     pub fn push<H: Hash>(&mut self, data: &H) {
-        // If the last level of the tree is bigger or equal than the amount of inputed data leafs then the level has padding, the value can be overwritten
+        // If the last level of the tree is bigger or equal than the amount of inputed data leaves then the level has padding, the value can be overwritten
         if self.tree[0].len() > self.data_amount {
             let mut index = self.data_amount;
             let mut level = 1;
@@ -52,11 +55,11 @@ impl MerkleTree {
                 index /= 2;
             }
         } else {
-            // If there wasn't any free space then the amount of leafs will duplicate
-            let mut leafs = vec![hash_value(data)];
-            // Add padding so that both subtrees have the same amount of leafs
-            add_padding(&mut leafs, self.tree[0].len());
-            let right_subtree = generate_tree_from_hashes(&mut leafs);
+            // If there wasn't any free space then the amount of leaves will duplicate
+            let mut leaves = vec![hash_value(data)];
+            // Add padding so that both subtrees have the same amount of leaves
+            add_padding(&mut leaves, self.tree[0].len());
+            let right_subtree = generate_tree_from_hashes(&mut leaves);
             merge_trees(&mut self.tree, right_subtree);
         }
         self.data_amount += 1;
@@ -87,7 +90,7 @@ impl MerkleTree {
         }
         proof
     }
-
+    /// Verifies if `value` is at `index` with the given `proof`
     pub fn verify<H: Hash>(&self, value: H, index: usize, proof: &mut Vec<u64>) -> bool {
         let mut mutable_index = index;
         let mut hashed_value = hash_value(&value);
@@ -124,39 +127,43 @@ pub fn hash_two_values<H: Hash>(left_child: &H, right_child: &H) -> u64 {
 }
 /// Add hashed 0s up to a desire size
 pub fn add_padding(tree_level: &mut Vec<u64>, up_to: usize) {
-    loop {
-        if up_to == tree_level.len() {
-            break;
+    if !tree_level.is_empty(){
+        loop {
+            if up_to == tree_level.len() {
+                break;
+            }
+            tree_level.push(hash_value(&0));
         }
-        tree_level.push(hash_value(&0));
     }
 }
-/// Generates a full tree from a list of hashed leafs.
+/// Generates a full tree from a list of hashed leaves.
 /// It returns a list of vectors, each representing a level of the tree
-pub fn generate_tree_from_hashes(leafs: &mut [u64]) -> Vec<Vec<u64>> {
+pub fn generate_tree_from_hashes(leaves: &mut [u64]) -> Vec<Vec<u64>> {
     let mut tree = Vec::new();
-    tree.push(leafs.to_vec());
+    tree.push(leaves.to_vec());
     // Calculate the combined hashes and push it
     let mut level_index = 0;
-    loop {
-        let mut next_level = Vec::new();
-        let mut index = 0;
+    if leaves.len()>1{
         loop {
-            let left_data = tree[level_index][index];
-            let right_data = tree[level_index][index + 1];
-            next_level.push(hash_two_values(&left_data, &right_data));
-            index += 2;
-            if tree[level_index].len() <= index {
+            let mut next_level = Vec::new();
+            let mut index = 0;
+            loop {
+                let left_data = tree[level_index][index];
+                let right_data = tree[level_index][index + 1];
+                next_level.push(hash_two_values(&left_data, &right_data));
+                index += 2;
+                if tree[level_index].len() <= index {
+                    break;
+                }
+            }
+            level_index += 1;
+            let len = next_level.len();
+            tree.push(next_level);
+            if len == 1 {
                 break;
             }
         }
-        level_index += 1;
-        let len = next_level.len();
-        tree.push(next_level);
-        if len == 1 {
-            break;
-        }
-    }
+    }   
     tree
 }
 /// Merges the second tree into the first one and calculates the new root

@@ -6,3 +6,6 @@ fmt:
 	cargo fmt --check
 test:
 	cargo test
+docs:
+	cargo docs
+	cargo docs --open
