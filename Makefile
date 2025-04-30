@@ -7,5 +7,5 @@ fmt:
 test:
 	cargo test
 docs:
-	cargo docs
-	cargo docs --open
+	cargo doc
+	cargo doc --open
