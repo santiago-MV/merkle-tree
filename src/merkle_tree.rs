@@ -75,8 +75,7 @@ impl MerkleTree {
         }
         let mut proof = Vec::new();
         let mut level_index = 0;
-        let mut i = 0;
-        while i < self.tree.len() {
+        for _ in 0..self.tree.len() {
             // If actual index is even, then is pointing to the left child, push the right one
             if index % 2 == 0 {
                 proof.push(self.tree[level_index][index + 1]);
@@ -91,7 +90,6 @@ impl MerkleTree {
             if level_index == self.tree.len() - 1 {
                 break;
             }
-            i += 1;
         }
         Ok(proof)
     }
